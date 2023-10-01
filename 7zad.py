@@ -1,7 +1,7 @@
-while True:
-    print ('Введите значение 1')
-    x = input()
-    print ('Введите значение 2')
-    y =input()
-    x,y = y,x
-    print (x, y)
+while True
+    print ('введите число')
+    number = int(input())
+    if number % 2 == 0:
+        print(f"{number} число чётное")
+    else:
+        print(f"{number} число нечётное")

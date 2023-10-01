@@ -1,7 +1,8 @@
 while True:
     print ('Как вас зовут')
     name = input()
-    if name == ('Иван'):
+    banname = ['Ivan', 'ivan', 'Иван', 'иван']
+    if name in banname:
         print ('Иванов больше не набираем')
     else:
         print ('Сколько вам лет?')
@@ -10,7 +11,7 @@ while True:
         if age > 75:
             print ('Проведите старость в покое')
         elif age <= 0:
-            print ('Не верю')
+            print ('не верю')
         elif age >= 16 and age <= 75:
             print ('Поздравляем вы поступили в ВГУИТ')
         else:
