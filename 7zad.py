@@ -1,4 +1,4 @@
-while True
+while True:
     print ('введите число')
     number = int(input())
     if number % 2 == 0:
