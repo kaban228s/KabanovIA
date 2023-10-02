@@ -5,5 +5,5 @@ def main():
     l = int(input('Введите длину свободного конца шнурка: '))
     N = int(input('Введите кол-во дырок в ряду: '))
     length = (2 * l + (2 * N - 1) * a + 2 * (N - 1) * b)
-    return(f'Искомая длина шнурка: {length}')
-print(main())
+    return(f'Длина шнурка: {length}')
+print (main())
