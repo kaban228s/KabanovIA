@@ -1,3 +1,4 @@
+# -- coding: utf-8 --
 while True:
     print ('Введите значение 1')
     x = input()

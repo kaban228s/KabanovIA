@@ -1,3 +1,4 @@
+# -- coding: utf-8 --
 print ('Введите число')
 seconds = int(input())
 n = seconds

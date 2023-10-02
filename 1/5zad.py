@@ -1,3 +1,4 @@
+# -- coding: utf-8 --
 while True:
     print ('Введите число')
     n = int(input())
