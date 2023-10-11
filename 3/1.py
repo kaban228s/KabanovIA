@@ -1,5 +1,7 @@
 # -- coding: utf-8 --
-a = int(input('Введите первое число '))
-b = int(input('Введите второе число '))
-c = int(input('Введите третье число '))
-print (f'Сумма чисел: {a+b+c}')
+def summ(a,b,c):
+    return(a+b+c)
+f = int(input('введите преове число: '))
+s = int(input('введите второе число: '))
+t = int(input('введите третье число: '))
+print ('сумма чисел: ',summ(f,s,t))
