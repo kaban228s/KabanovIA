@@ -6,4 +6,4 @@ day = n // 86400
 hour = n // 3600
 minute = n // 60
 sec = n
-print (day, hour, minute, sec)
+print (f'дни {day}, часы {hour}, минуты {minute}, секунды {sec}')
