@@ -1,0 +1,169 @@
+#include "stm32f4xx.h"
+#include "stm32f4xx_rcc.h"
+#include "stm32f4xx_gpio.h"
+#include "stm32f4xx_exti.h"
+#include "stm32f4xx_tim.h"
+#include "misc.h"
+
+volatile uint8_t mode = 1; // текущий режим (1 или 2)
+volatile uint8_t flag = 0; // флаг таймера
+
+//------------------------------------------------------
+// Инициализация портов
+//------------------------------------------------------
+void GPIO_Config(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct;
+    
+    // Тактирование портов D и A
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD | RCC_AHB1Periph_GPIOA, ENABLE);
+    
+    // Светодиоды PD4 и PD1 – выход (Канал А = 4, Канал Б = 1)
+    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_1;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_100MHz;
+    GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+    GPIO_Init(GPIOD, &GPIO_InitStruct);
+    
+    // Кнопка PA1 – вход с подтяжкой вверх
+    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_1;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN;
+    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+//------------------------------------------------------
+// Настройка внешнего прерывания на PA1
+//------------------------------------------------------
+void EXTI_Config(void)
+{
+    EXTI_InitTypeDef EXTI_InitStruct;
+    NVIC_InitTypeDef NVIC_InitStruct;
+    
+    // Включаем тактирование контроллера внешних прерываний
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+    
+    // Подключение линии 1 (PA1)
+    EXTI_InitStruct.EXTI_Line = EXTI_Line1;
+    EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
+    EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising; // по фронту (Rising)
+    EXTI_InitStruct.EXTI_LineCmd = ENABLE;
+    EXTI_Init(&EXTI_InitStruct);
+    
+    // Включаем прерывание EXTI1 в контроллере NVIC
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+    NVIC_InitStruct.NVIC_IRQChannel = EXTI1_IRQn;
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x00;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x00;
+    NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStruct);
+}
+
+//------------------------------------------------------
+// Инициализация таймера TIM9
+//------------------------------------------------------
+void TIM9_Config(void)
+{
+    TIM_TimeBaseInitTypeDef TIM_InitStruct;
+    NVIC_InitTypeDef NVIC_InitStruct;
+    
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM9, ENABLE);
+    
+    // Режим 1: Канал А = 5 сек, Канал Б = 1 сек
+    // Начинаем с Канала А (5 сек)
+    TIM_InitStruct.TIM_Prescaler = 8399;     // 84 МГц / 8400 = 10 кГц
+    TIM_InitStruct.TIM_Period = 49999;       // 50000 × 0.1 мс = 5 с
+    TIM_InitStruct.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_InitStruct.TIM_ClockDivision = 0;
+    TIM_InitStruct.TIM_RepetitionCounter = 0;
+    TIM_TimeBaseInit(TIM9, &TIM_InitStruct);
+    
+    TIM_ITConfig(TIM9, TIM_IT_Update, ENABLE);
+    
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+    NVIC_InitStruct.NVIC_IRQChannel = TIM1_BRK_TIM9_IRQn;
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStruct);
+    
+    TIM_Cmd(TIM9, ENABLE);
+}
+
+//------------------------------------------------------
+// Обработчик прерывания от кнопки PA1
+//------------------------------------------------------
+void EXTI1_IRQHandler(void)
+{
+    if (EXTI_GetITStatus(EXTI_Line1) != RESET)
+    {
+        mode = (mode == 1) ? 2 : 1; // переключение режима
+        
+        // Перенастройка таймера в зависимости от режима
+        if (mode == 1) 
+        {
+            // Режим 1: Канал А = 5 сек
+            TIM_SetAutoreload(TIM9, 49999);  // 5 сек
+        }
+        else 
+        {
+            // Режим 2: Канал А = 1 сек
+            TIM_SetAutoreload(TIM9, 9999);   // 1 сек
+        }
+        
+        EXTI_ClearITPendingBit(EXTI_Line1);
+    }
+}
+
+//------------------------------------------------------
+// Обработчик прерывания от таймера TIM9
+//------------------------------------------------------
+void TIM1_BRK_TIM9_IRQHandler(void)
+{
+    if (TIM_GetITStatus(TIM9, TIM_IT_Update) != RESET)
+    {
+        flag = 1; // устанавливаем флаг
+        TIM_ClearITPendingBit(TIM9, TIM_IT_Update);
+    }
+}
+
+//------------------------------------------------------
+// Главная функция
+//------------------------------------------------------
+int main(void)
+{
+    uint8_t led_state_A = 0; // состояние светодиода канала А (PD4)
+    uint8_t led_state_B = 0; // состояние светодиода канала Б (PD1)
+    
+    GPIO_Config();
+    EXTI_Config();
+    TIM9_Config();
+    
+    while(1)
+    {
+        if (flag == 1)
+        {
+            flag = 0;
+            
+            if (mode == 1)
+            {
+                // Режим 1: Канал А мигает с периодом 5 сек
+                led_state_A = !led_state_A;
+                if (led_state_A)
+                    GPIO_SetBits(GPIOD, GPIO_Pin_4);
+                else
+                    GPIO_ResetBits(GPIOD, GPIO_Pin_4);
+            }
+            else
+            {
+                // Режим 2: Канал А мигает с периодом 1 сек
+                led_state_A = !led_state_A;
+                if (led_state_A)
+                    GPIO_SetBits(GPIOD, GPIO_Pin_4);
+                else
+                    GPIO_ResetBits(GPIOD, GPIO_Pin_4);
+            }
+        }
+    }
+}
